@@ -2,7 +2,8 @@ import { InboxOutlined } from '@ant-design/icons'
 import { Alert, Button, Form, Input, Spin, Upload } from 'antd'
 import type { RcFile } from 'antd/es/upload'
 import axios from 'axios'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { getForecastVersions } from '../../api/forecastVersionApi'
 import { uploadPlanCsv } from '../../api/workloadApi'
 import type { CsvUploadResponse, CsvValidationError } from '../../types/workloadTypes'
 
@@ -16,12 +17,32 @@ interface Props {
   onError?: (errors: CsvValidationError[]) => void
 }
 
+const todayPrefix = (() => {
+  const d = new Date()
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}${m}${day}`
+})()
+
 const CsvUploadArea = ({ onSuccess, onError }: Props) => {
   const [form] = Form.useForm<FormValues>()
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [uploading, setUploading] = useState(false)
   const [extensionError, setExtensionError] = useState(false)
   const [serverError, setServerError] = useState<string | null>(null)
+
+  useEffect(() => {
+    getForecastVersions()
+      .then((versions) => {
+        const count = versions.filter((v) => v.name.startsWith(`${todayPrefix}_`)).length
+        const nn = String(count + 1).padStart(2, '0')
+        form.setFieldValue('version_name', `${todayPrefix}_${nn}`)
+      })
+      .catch(() => {
+        form.setFieldValue('version_name', `${todayPrefix}_01`)
+      })
+  }, [form])
 
   const beforeUpload = (file: RcFile): false => {
     if (!file.name.toLowerCase().endsWith('.csv')) {
@@ -52,7 +73,10 @@ const CsvUploadArea = ({ onSuccess, onError }: Props) => {
       )
       onSuccess?.(result)
       setSelectedFile(null)
+      // アップロード後に連番を +1 してデフォルト値を更新
+      const nn = String(result.version_no + 1).padStart(2, '0')
       form.resetFields()
+      form.setFieldValue('version_name', `${todayPrefix}_${nn}`)
     } catch (err) {
       if (axios.isAxiosError(err)) {
         if (!err.response) {
