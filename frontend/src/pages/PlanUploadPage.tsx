@@ -1,12 +1,12 @@
 import { DeleteOutlined } from '@ant-design/icons'
-import { Button, Divider, Modal, Typography, notification } from 'antd'
+import { Alert, Button, Divider, Modal, Space, Typography, notification } from 'antd'
 import { useState } from 'react'
 import { clearMonthlyWorkloads } from '../api/workloadApi'
 import CsvUploadArea from '../components/upload/CsvUploadArea'
 import UploadResultPanel from '../components/upload/UploadResultPanel'
 import type { CsvUploadResponse, CsvValidationError } from '../types/workloadTypes'
 
-const { Title } = Typography
+const { Title, Text } = Typography
 
 type UploadResult =
   | { kind: 'success'; versionNo: number; summary: CsvUploadResponse['summary'] }
@@ -15,7 +15,9 @@ type UploadResult =
 
 const PlanUploadPage = () => {
   const [result, setResult] = useState<UploadResult>(null)
+  const [clearModalOpen, setClearModalOpen] = useState(false)
   const [clearing, setClearing] = useState(false)
+  const [clearError, setClearError] = useState<string | null>(null)
 
   const handleSuccess = (res: CsvUploadResponse) => {
     notification.success({
@@ -33,31 +35,24 @@ const PlanUploadPage = () => {
     setResult({ kind: 'error', errors })
   }
 
-  const handleClear = () => {
-    Modal.confirm({
-      title: 'データをクリアしますか？',
-      content: '月次工数（monthly_workloads）の全レコードを削除します。この操作は取り消せません。',
-      okText: 'クリアする',
-      okType: 'danger',
-      cancelText: 'キャンセル',
-      onOk: async () => {
-        setClearing(true)
-        try {
-          const res = await clearMonthlyWorkloads()
-          notification.success({
-            message: 'データクリア完了',
-            description: `${res.deleted_count.toLocaleString()} 件のレコードを削除しました。`,
-            placement: 'topRight',
-          })
-          setResult(null)
-        } catch {
-          notification.error({ message: 'データクリアに失敗しました', placement: 'topRight' })
-          throw new Error('clear failed')
-        } finally {
-          setClearing(false)
-        }
-      },
-    })
+  const handleClearConfirm = async () => {
+    setClearing(true)
+    setClearError(null)
+    try {
+      const res = await clearMonthlyWorkloads()
+      setClearModalOpen(false)
+      setResult(null)
+      notification.success({
+        message: 'データクリア完了',
+        description: `${res.deleted_count.toLocaleString()} 件のレコードを削除しました。`,
+        placement: 'topRight',
+        duration: 5,
+      })
+    } catch {
+      setClearError('データクリアに失敗しました。サーバーログを確認してください。')
+    } finally {
+      setClearing(false)
+    }
   }
 
   return (
@@ -71,17 +66,38 @@ const PlanUploadPage = () => {
       <div>
         <Title level={5} style={{ color: '#cf1322', marginBottom: 8 }}>データクリア</Title>
         <p style={{ color: '#666', marginBottom: 12 }}>
-          月次工数データ（monthly_workloads）の全レコードを削除します。マスタデータ（要員・プロジェクト等）は削除されません。
+          月次工数データの全レコードを削除します。マスタデータ（要員・プロジェクト等）は削除されません。
         </p>
         <Button
           danger
           icon={<DeleteOutlined />}
-          loading={clearing}
-          onClick={handleClear}
+          onClick={() => { setClearError(null); setClearModalOpen(true) }}
         >
           データクリア
         </Button>
       </div>
+
+      <Modal
+        title="データをクリアしますか？"
+        open={clearModalOpen}
+        onOk={handleClearConfirm}
+        onCancel={() => { setClearModalOpen(false); setClearError(null) }}
+        okText="クリアする"
+        okButtonProps={{ danger: true, loading: clearing }}
+        cancelButtonProps={{ disabled: clearing }}
+        cancelText="キャンセル"
+        closable={!clearing}
+        maskClosable={!clearing}
+        destroyOnHidden
+      >
+        <Space direction="vertical" style={{ width: '100%' }}>
+          <Text>月次工数（monthly_workloads）の全レコードを削除します。</Text>
+          <Text type="warning">この操作は取り消せません。</Text>
+          {clearError && (
+            <Alert type="error" message={clearError} showIcon />
+          )}
+        </Space>
+      </Modal>
     </div>
   )
 }
