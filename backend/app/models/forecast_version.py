@@ -16,5 +16,8 @@ class ForecastVersion(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, server_default=func.now())
 
     snapshots: Mapped[list["ForecastSnapshot"]] = relationship(
-        "ForecastSnapshot", back_populates="version"
+        "ForecastSnapshot",
+        back_populates="version",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
     )
