@@ -14,7 +14,6 @@ class ImportSummary(BaseModel):
 
 
 class CsvUploadResponse(BaseModel):
-    version_no: int
     summary: ImportSummary
 
 

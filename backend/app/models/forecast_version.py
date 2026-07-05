@@ -11,8 +11,8 @@ class ForecastVersion(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     version_no: Mapped[int] = mapped_column(Integer, nullable=False)
-    trigger_type: Mapped[str] = mapped_column(String(20), nullable=False)
-    note: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    name: Mapped[str] = mapped_column(String(100), nullable=False)
+    description: Mapped[str | None] = mapped_column(String(500), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, server_default=func.now())
 
     snapshots: Mapped[list["ForecastSnapshot"]] = relationship(

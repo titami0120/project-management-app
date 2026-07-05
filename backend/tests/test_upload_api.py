@@ -92,14 +92,13 @@ def test_upload_valid_csv_returns_200(api_client: TestClient) -> None:
     assert resp.status_code == 200
 
 
-def test_upload_valid_csv_response_has_version_no(api_client: TestClient) -> None:
+def test_upload_valid_csv_response_no_version_no(api_client: TestClient) -> None:
     resp = api_client.post(
         "/api/v1/workloads/plan/upload",
         files={"file": ("plan.csv", _valid_csv_bytes(), "text/csv")},
     )
     body = resp.json()
-    assert "version_no" in body
-    assert body["version_no"] == 1
+    assert "version_no" not in body
 
 
 def test_upload_valid_csv_response_has_summary(api_client: TestClient) -> None:

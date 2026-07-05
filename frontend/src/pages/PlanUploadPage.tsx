@@ -1,4 +1,4 @@
-import { notification, Typography } from 'antd'
+import { Typography, notification } from 'antd'
 import { useState } from 'react'
 import CsvUploadArea from '../components/upload/CsvUploadArea'
 import UploadResultPanel from '../components/upload/UploadResultPanel'
@@ -7,7 +7,7 @@ import type { CsvUploadResponse, CsvValidationError } from '../types/workloadTyp
 const { Title } = Typography
 
 type UploadResult =
-  | { kind: 'success'; versionNo: number; summary: CsvUploadResponse['summary'] }
+  | { kind: 'success'; summary: CsvUploadResponse['summary'] }
   | { kind: 'error'; errors: CsvValidationError[] }
   | null
 
@@ -16,10 +16,10 @@ const PlanUploadPage = () => {
 
   const handleSuccess = (res: CsvUploadResponse) => {
     notification.success({
-      message: `バージョン ${res.version_no} のアップロードが完了しました`,
+      message: 'アップロードが完了しました',
       placement: 'topRight',
     })
-    setResult({ kind: 'success', versionNo: res.version_no, summary: res.summary })
+    setResult({ kind: 'success', summary: res.summary })
   }
 
   const handleError = (errors: CsvValidationError[]) => {

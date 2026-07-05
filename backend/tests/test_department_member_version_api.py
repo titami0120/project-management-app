@@ -64,8 +64,8 @@ def api_client_with_data():  # type: ignore[return]
         m2 = Member(employee_code="E002", name="佐藤二郎", department_id=d1.id)
         m3 = Member(employee_code="E003", name="田中三郎", department_id=d2.id)
         seed_db.add_all([m1, m2, m3])
-        v1 = ForecastVersion(version_no=1, trigger_type="plan_upload")
-        v2 = ForecastVersion(version_no=2, trigger_type="plan_upload")
+        v1 = ForecastVersion(version_no=1, name="バージョン1")
+        v2 = ForecastVersion(version_no=2, name="バージョン2")
         seed_db.add_all([v1, v2])
         seed_db.commit()
 
@@ -209,11 +209,13 @@ class TestGetForecastVersions:
     def test_get_versions_response_fields(
         self, api_client_with_data: TestClient
     ) -> None:
-        """レスポンスに id・version_no・trigger_type・created_at が含まれる"""
+        """レスポンスに id・version_no・name・description・snapshot_count・created_at が含まれる"""
         item = api_client_with_data.get("/api/v1/forecast-versions").json()[0]
         assert "id" in item
         assert "version_no" in item
-        assert "trigger_type" in item
+        assert "name" in item
+        assert "description" in item
+        assert "snapshot_count" in item
         assert "created_at" in item
 
     def test_get_versions_sorted_descending(

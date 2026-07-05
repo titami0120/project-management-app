@@ -14,6 +14,7 @@ from app.models.monthly_workload import MonthlyWorkload
 from app.models.project import Project
 from app.services.csv_import_service import CsvImportService
 from app.services.exceptions import CsvValidationException
+from app.services.forecast_service import ForecastService
 
 # ---------------------------------------------------------------------------
 # helpers
@@ -210,55 +211,90 @@ class TestMonthlyWorkloadUpsert:
 
 
 # ---------------------------------------------------------------------------
-# タスク3.4: 見込工数バージョンとスナップショット
+# バージョン保存とスナップショット（CSVアップロードでは作成しない）
 # ---------------------------------------------------------------------------
 
+forecast_service = ForecastService()
+
+
 class TestForecastVersionAndSnapshot:
-    def test_forecast_version_is_created(self, db_session: Session) -> None:
+    def test_csv_upload_does_not_create_version(self, db_session: Session) -> None:
         csv_bytes = _make_csv([_row(apr="1.00")], extra_headers=["WBSコード"])
-        result = service.import_plan_csv(csv_bytes, db_session)
+        service.import_plan_csv(csv_bytes, db_session)
         versions = db_session.query(ForecastVersion).all()
-        assert len(versions) == 1
-        assert versions[0].trigger_type == "plan_upload"
-        assert result.version_no == 1
+        assert len(versions) == 0
 
-    def test_second_upload_increments_version_no(self, db_session: Session) -> None:
+    def test_manual_version_creates_snapshot(self, db_session: Session) -> None:
         csv_bytes = _make_csv([_row(apr="1.00")], extra_headers=["WBSコード"])
         service.import_plan_csv(csv_bytes, db_session)
-        result2 = service.import_plan_csv(csv_bytes, db_session)
-        assert result2.version_no == 2
-
-    def test_forecast_snapshot_is_created(self, db_session: Session) -> None:
-        csv_bytes = _make_csv([_row(apr="1.00")], extra_headers=["WBSコード"])
-        service.import_plan_csv(csv_bytes, db_session)
+        version_no = forecast_service.create_version_with_snapshot(
+            db_session, name="テスト版", description="詳細説明"
+        )
+        assert version_no == 1
         snapshots = db_session.query(ForecastSnapshot).all()
         assert len(snapshots) == 1
         assert snapshots[0].forecast_mm == Decimal("1.00")
 
-    def test_snapshot_uses_simulated_mm_when_set(self, db_session: Session) -> None:
+    def test_manual_version_increments_version_no(self, db_session: Session) -> None:
+        csv_bytes = _make_csv([_row(apr="1.00")], extra_headers=["WBSコード"])
+        service.import_plan_csv(csv_bytes, db_session)
+        forecast_service.create_version_with_snapshot(db_session, name="v1")
+        version_no2 = forecast_service.create_version_with_snapshot(db_session, name="v2")
+        assert version_no2 == 2
+
+    def test_snapshot_uses_planned_mm_not_simulated(self, db_session: Session) -> None:
         csv_bytes = _make_csv([_row(apr="1.00")], extra_headers=["WBSコード"])
         service.import_plan_csv(csv_bytes, db_session)
         record = db_session.query(MonthlyWorkload).first()
         assert record is not None
         record.simulated_mm = Decimal("0.75")
         db_session.commit()
-        service.import_plan_csv(csv_bytes, db_session)
-        last_ver = db_session.query(ForecastVersion).order_by(ForecastVersion.id.desc()).first()
-        assert last_ver is not None
-        snap = db_session.query(ForecastSnapshot).filter_by(
-            version_id=last_ver.id, month=4
-        ).first()
+        forecast_service.create_version_with_snapshot(db_session, name="テスト版")
+        snap = db_session.query(ForecastSnapshot).filter_by(month=4).first()
         assert snap is not None
-        assert snap.forecast_mm == Decimal("0.75")
+        assert snap.forecast_mm == Decimal("1.00")
 
-    def test_version_and_snapshot_same_version_id(self, db_session: Session) -> None:
+    def test_restore_from_version(self, db_session: Session) -> None:
         csv_bytes = _make_csv([_row(apr="1.00")], extra_headers=["WBSコード"])
         service.import_plan_csv(csv_bytes, db_session)
+        forecast_service.create_version_with_snapshot(db_session, name="テスト版")
         version = db_session.query(ForecastVersion).first()
-        snapshot = db_session.query(ForecastSnapshot).first()
-        assert version is not None
-        assert snapshot is not None
-        assert snapshot.version_id == version.id
+        record = db_session.query(MonthlyWorkload).first()
+        assert record is not None
+        record.planned_mm = Decimal("0.50")
+        db_session.commit()
+        restored = forecast_service.restore_from_version(db_session, version.id)
+        assert restored == 1
+        db_session.expire_all()
+        record = db_session.query(MonthlyWorkload).first()
+        assert record is not None
+        assert record.planned_mm == Decimal("1.00")
+        assert record.simulated_mm is None
+
+    def test_restore_deletes_extra_records(self, db_session: Session) -> None:
+        """スナップショット後に追加されたレコードは復元時に削除される"""
+        csv_bytes = _make_csv([_row(apr="1.00")], extra_headers=["WBSコード"])
+        service.import_plan_csv(csv_bytes, db_session)
+        forecast_service.create_version_with_snapshot(db_session, name="v1")
+        version = db_session.query(ForecastVersion).first()
+
+        # スナップショット後にレコードを追加
+        existing = db_session.query(MonthlyWorkload).first()
+        assert existing is not None
+        extra = MonthlyWorkload(
+            member_id=existing.member_id,
+            project_id=existing.project_id,
+            year=existing.year,
+            month=5,
+            planned_mm=Decimal("0.30"),
+        )
+        db_session.add(extra)
+        db_session.commit()
+        assert db_session.query(MonthlyWorkload).count() == 2
+
+        forecast_service.restore_from_version(db_session, version.id)
+        db_session.expire_all()
+        assert db_session.query(MonthlyWorkload).count() == 1
 
 
 # ---------------------------------------------------------------------------

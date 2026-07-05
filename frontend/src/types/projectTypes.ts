@@ -36,7 +36,13 @@ export interface MemberResponse {
 export interface ForecastVersionResponse {
   id: number
   version_no: number
-  trigger_type: string
-  note: string | null
+  name: string
+  description: string | null
+  snapshot_count: number
   created_at: string
+}
+
+export interface CreateVersionRequest {
+  name: string
+  description?: string
 }

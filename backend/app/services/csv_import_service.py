@@ -17,8 +17,6 @@ from app.schemas.workload_schema import (
     ImportSummary,
 )
 from app.services.exceptions import CsvValidationException
-from app.services.forecast_service import ForecastService
-
 REQUIRED_HEADERS: list[str] = [
     "所属部門コード", "所属部門名", "社員コード", "氏名",
     "WBS仮コード", "WBS名称", "会計年度",
@@ -44,29 +42,23 @@ _MONTH_MAP: dict[str, tuple[int, int]] = {
 
 
 class CsvImportService:
-    def __init__(self) -> None:
-        self._forecast_service = ForecastService()
-
     # ------------------------------------------------------------------
     # 公開: メインエントリ
     # ------------------------------------------------------------------
 
     def import_plan_csv(self, file_content: bytes, db: Session) -> CsvUploadResponse:
-        """CSVをインポートし、バリデーション → upsert → バージョン作成 を行う。"""
+        """CSVをインポートし、バリデーション → upsert を行う。"""
         fieldnames, rows = self._validate_and_parse(file_content)
         has_wbs_code = "WBSコード" in fieldnames
 
         try:
             summary = self._upsert_all(rows, has_wbs_code, db)
-            version_no = self._forecast_service.create_version_with_snapshot(
-                db, trigger_type="plan_upload"
-            )
             db.commit()
         except Exception:
             db.rollback()
             raise
 
-        return CsvUploadResponse(version_no=version_no, summary=summary)
+        return CsvUploadResponse(summary=summary)
 
     # ------------------------------------------------------------------
     # 公開: バリデーション + パース
@@ -75,7 +67,14 @@ class CsvImportService:
     def _validate_and_parse(
         self, file_content: bytes
     ) -> tuple[list[str], list[dict[str, str]]]:
-        text = file_content.decode("shift_jis")
+        for encoding in ("cp932", "utf-8-sig", "utf-8"):
+            try:
+                text = file_content.decode(encoding)
+                break
+            except UnicodeDecodeError:
+                continue
+        else:
+            raise CsvValidationException(["ファイルのエンコーディングを判別できません。CP932 (Shift-JIS) または UTF-8 で保存してください。"])
         reader = csv.DictReader(io.StringIO(text))
         fieldnames: list[str] = list(reader.fieldnames or [])
 
