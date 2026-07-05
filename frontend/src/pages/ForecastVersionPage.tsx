@@ -24,10 +24,13 @@ const ForecastVersionPage = () => {
   const [versions, setVersions] = useState<ForecastVersionResponse[]>([])
   const [loading, setLoading] = useState(false)
 
-  // 復元確認モーダル用ステート
   const [restoreTarget, setRestoreTarget] = useState<ForecastVersionResponse | null>(null)
   const [restoring, setRestoring] = useState(false)
   const [restoreError, setRestoreError] = useState<string | null>(null)
+
+  const [deleteTarget, setDeleteTarget] = useState<ForecastVersionResponse | null>(null)
+  const [deleting, setDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
 
   const load = useCallback(() => {
     setLoading(true)
@@ -38,11 +41,6 @@ const ForecastVersionPage = () => {
   }, [])
 
   useEffect(() => { load() }, [load])
-
-  const openRestoreModal = useCallback((v: ForecastVersionResponse) => {
-    setRestoreTarget(v)
-    setRestoreError(null)
-  }, [])
 
   const handleRestoreConfirm = useCallback(async () => {
     if (!restoreTarget) return
@@ -64,29 +62,21 @@ const ForecastVersionPage = () => {
     }
   }, [restoreTarget])
 
-  const handleDelete = useCallback((v: ForecastVersionResponse) => {
-    Modal.confirm({
-      title: `v${v.version_no}「${v.name}」を削除しますか？`,
-      content: 'スナップショットデータもすべて削除されます。',
-      okText: '削除する',
-      okType: 'danger',
-      cancelText: 'キャンセル',
-      onOk: async () => {
-        try {
-          await deleteForecastVersion(v.id)
-          notification.success({ message: 'バージョンを削除しました', placement: 'topRight' })
-          load()
-        } catch (err) {
-          notification.error({
-            message: '削除に失敗しました',
-            description: extractErrorMessage(err),
-            placement: 'topRight',
-          })
-          throw err
-        }
-      },
-    })
-  }, [load])
+  const handleDeleteConfirm = useCallback(async () => {
+    if (!deleteTarget) return
+    setDeleting(true)
+    setDeleteError(null)
+    try {
+      await deleteForecastVersion(deleteTarget.id)
+      setDeleteTarget(null)
+      notification.success({ message: 'バージョンを削除しました', placement: 'topRight' })
+      load()
+    } catch (err) {
+      setDeleteError(extractErrorMessage(err))
+    } finally {
+      setDeleting(false)
+    }
+  }, [deleteTarget, load])
 
   const columns: ColumnsType<ForecastVersionResponse> = [
     {
@@ -132,7 +122,7 @@ const ForecastVersionPage = () => {
           <Button
             size="small"
             icon={<RollbackOutlined />}
-            onClick={() => openRestoreModal(record)}
+            onClick={() => { setRestoreTarget(record); setRestoreError(null) }}
           >
             復元
           </Button>
@@ -140,7 +130,7 @@ const ForecastVersionPage = () => {
             size="small"
             danger
             icon={<DeleteOutlined />}
-            onClick={() => handleDelete(record)}
+            onClick={() => { setDeleteTarget(record); setDeleteError(null) }}
           />
         </Space>
       ),
@@ -159,6 +149,7 @@ const ForecastVersionPage = () => {
         size="middle"
       />
 
+      {/* 復元モーダル */}
       <Modal
         title="バージョンを復元しますか？"
         open={!!restoreTarget}
@@ -183,12 +174,38 @@ const ForecastVersionPage = () => {
             </Text>
             <Text type="warning">この操作は取り消せません。</Text>
             {restoreError && (
-              <Alert
-                type="error"
-                message="復元に失敗しました"
-                description={restoreError}
-                showIcon
-              />
+              <Alert type="error" message="復元に失敗しました" description={restoreError} showIcon />
+            )}
+          </Space>
+        )}
+      </Modal>
+
+      {/* 削除モーダル */}
+      <Modal
+        title="バージョンを削除しますか？"
+        open={!!deleteTarget}
+        onOk={handleDeleteConfirm}
+        onCancel={() => { setDeleteTarget(null); setDeleteError(null) }}
+        okText="削除する"
+        okButtonProps={{ danger: true, loading: deleting }}
+        cancelButtonProps={{ disabled: deleting }}
+        cancelText="キャンセル"
+        closable={!deleting}
+        maskClosable={!deleting}
+        destroyOnHidden
+      >
+        {deleteTarget && (
+          <Space direction="vertical" style={{ width: '100%' }}>
+            <Text>
+              <Tag color="blue">v{deleteTarget.version_no}</Tag>
+              <Text strong>{deleteTarget.name}</Text> を削除します。
+            </Text>
+            <Text type="secondary">
+              スナップショット件数: {deleteTarget.snapshot_count.toLocaleString()} 件
+            </Text>
+            <Text type="warning">スナップショットデータもすべて削除されます。この操作は取り消せません。</Text>
+            {deleteError && (
+              <Alert type="error" message="削除に失敗しました" description={deleteError} showIcon />
             )}
           </Space>
         )}
