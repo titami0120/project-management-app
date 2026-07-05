@@ -119,6 +119,43 @@ project-management-app/
 └── README.md
 ```
 
+## サーバーの起動・停止
+
+### バックエンド（ポート 8000）
+
+```bash
+cd backend
+venv\Scripts\activate   # Windows（新しいターミナルを開くたびに必要）
+# source venv/bin/activate  # Mac / Linux
+
+# 通常起動
+python -m uvicorn app.main:app --host 0.0.0.0 --port 8000
+
+# コード変更を自動反映する場合（開発時推奨）
+python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+```
+
+停止: **Ctrl + C**
+
+### フロントエンド（ポート 5173）
+
+```bash
+cd frontend
+npm run dev
+```
+
+停止: **Ctrl + C**
+
+### プロセスが残った場合の強制停止（Windows）
+
+```powershell
+# ポートを使用しているPIDを確認
+netstat -ano | findstr ":8000"
+
+# PIDを指定して強制停止
+taskkill /PID <PID> /F
+```
+
 ## 主なコマンド
 
 ### バックエンド
