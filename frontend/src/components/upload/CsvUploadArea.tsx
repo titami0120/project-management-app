@@ -1,10 +1,15 @@
 import { InboxOutlined } from '@ant-design/icons'
-import { Alert, Button, Spin, Upload } from 'antd'
+import { Alert, Button, Form, Input, Spin, Upload } from 'antd'
 import type { RcFile } from 'antd/es/upload'
 import axios from 'axios'
 import { useState } from 'react'
 import { uploadPlanCsv } from '../../api/workloadApi'
 import type { CsvUploadResponse, CsvValidationError } from '../../types/workloadTypes'
+
+interface FormValues {
+  version_name: string
+  version_description?: string
+}
 
 interface Props {
   onSuccess?: (result: CsvUploadResponse) => void
@@ -12,6 +17,7 @@ interface Props {
 }
 
 const CsvUploadArea = ({ onSuccess, onError }: Props) => {
+  const [form] = Form.useForm<FormValues>()
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [uploading, setUploading] = useState(false)
   const [extensionError, setExtensionError] = useState(false)
@@ -30,21 +36,30 @@ const CsvUploadArea = ({ onSuccess, onError }: Props) => {
 
   const handleUpload = async () => {
     if (!selectedFile) return
+    let values: FormValues
+    try {
+      values = await form.validateFields()
+    } catch {
+      return
+    }
     setUploading(true)
     setServerError(null)
     try {
-      const result = await uploadPlanCsv(selectedFile)
+      const result = await uploadPlanCsv(
+        selectedFile,
+        values.version_name,
+        values.version_description,
+      )
       onSuccess?.(result)
       setSelectedFile(null)
+      form.resetFields()
     } catch (err) {
       if (axios.isAxiosError(err)) {
         if (!err.response) {
-          // レスポンスなし = サーバー未起動または CORS エラー
           setServerError(
             'バックエンドサーバーに接続できません（http://localhost:8000）。サーバーが起動しているか確認してください。'
           )
         } else if (err.response.status === 422) {
-          // FastAPI は {"detail": {"errors": [...]}} で返す
           const body = err.response.data as { detail: { errors: CsvValidationError[] } }
           onError?.(body.detail.errors)
         } else if (err.response.status === 500) {
@@ -68,6 +83,24 @@ const CsvUploadArea = ({ onSuccess, onError }: Props) => {
 
   return (
     <Spin spinning={uploading} tip="アップロード中...">
+      <Form form={form} layout="vertical">
+        <Form.Item
+          name="version_name"
+          label="バージョン名"
+          rules={[{ required: true, message: 'バージョン名を入力してください' }]}
+        >
+          <Input placeholder="例: 2026年度 初版" maxLength={100} />
+        </Form.Item>
+        <Form.Item name="version_description" label="詳細">
+          <Input.TextArea
+            placeholder="変更内容や備考を入力（任意）"
+            rows={3}
+            maxLength={500}
+            showCount
+          />
+        </Form.Item>
+      </Form>
+
       <Upload.Dragger
         accept=".csv"
         beforeUpload={beforeUpload}

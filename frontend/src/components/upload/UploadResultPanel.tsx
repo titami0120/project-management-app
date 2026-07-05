@@ -7,6 +7,7 @@ const { Text } = Typography
 
 interface SuccessProps {
   kind: 'success'
+  versionNo: number
   summary: ImportSummary
 }
 
@@ -55,7 +56,7 @@ const UploadResultPanel = (props: Props) => {
       <div style={{ marginTop: 24 }}>
         <Alert
           type="success"
-          message={<Text strong>アップロードが完了しました</Text>}
+          message={<Text strong>v{props.versionNo} としてアップロードが完了しました</Text>}
           showIcon
           style={{ marginBottom: 16 }}
         />

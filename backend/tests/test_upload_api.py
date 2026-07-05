@@ -54,6 +54,14 @@ def _invalid_csv_bytes() -> bytes:
     return buf.getvalue().encode("shift_jis")
 
 
+def _upload(client: TestClient, csv_bytes: bytes, version_name: str = "テスト版") -> object:
+    return client.post(
+        "/api/v1/workloads/plan/upload",
+        files={"file": ("plan.csv", csv_bytes, "text/csv")},
+        data={"version_name": version_name},
+    )
+
+
 @pytest.fixture()
 def api_client() -> TestClient:  # type: ignore[return]
     test_engine = create_engine(
@@ -85,27 +93,19 @@ def api_client() -> TestClient:  # type: ignore[return]
 # ---------------------------------------------------------------------------
 
 def test_upload_valid_csv_returns_200(api_client: TestClient) -> None:
-    resp = api_client.post(
-        "/api/v1/workloads/plan/upload",
-        files={"file": ("plan.csv", _valid_csv_bytes(), "text/csv")},
-    )
+    resp = _upload(api_client, _valid_csv_bytes())
     assert resp.status_code == 200
 
 
-def test_upload_valid_csv_response_no_version_no(api_client: TestClient) -> None:
-    resp = api_client.post(
-        "/api/v1/workloads/plan/upload",
-        files={"file": ("plan.csv", _valid_csv_bytes(), "text/csv")},
-    )
+def test_upload_valid_csv_response_has_version_no(api_client: TestClient) -> None:
+    resp = _upload(api_client, _valid_csv_bytes())
     body = resp.json()
-    assert "version_no" not in body
+    assert "version_no" in body
+    assert body["version_no"] == 1
 
 
 def test_upload_valid_csv_response_has_summary(api_client: TestClient) -> None:
-    resp = api_client.post(
-        "/api/v1/workloads/plan/upload",
-        files={"file": ("plan.csv", _valid_csv_bytes(), "text/csv")},
-    )
+    resp = _upload(api_client, _valid_csv_bytes())
     body = resp.json()
     assert "summary" in body
     assert body["summary"]["departments"]["created"] == 1
@@ -115,18 +115,12 @@ def test_upload_valid_csv_response_has_summary(api_client: TestClient) -> None:
 
 
 def test_upload_invalid_csv_returns_422(api_client: TestClient) -> None:
-    resp = api_client.post(
-        "/api/v1/workloads/plan/upload",
-        files={"file": ("plan.csv", _invalid_csv_bytes(), "text/csv")},
-    )
+    resp = _upload(api_client, _invalid_csv_bytes())
     assert resp.status_code == 422
 
 
 def test_upload_invalid_csv_response_has_errors(api_client: TestClient) -> None:
-    resp = api_client.post(
-        "/api/v1/workloads/plan/upload",
-        files={"file": ("plan.csv", _invalid_csv_bytes(), "text/csv")},
-    )
+    resp = _upload(api_client, _invalid_csv_bytes())
     body = resp.json()
     assert "detail" in body
     assert "errors" in body["detail"]

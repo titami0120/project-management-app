@@ -17,6 +17,7 @@ from app.schemas.workload_schema import (
     ImportSummary,
 )
 from app.services.exceptions import CsvValidationException
+from app.services.forecast_service import ForecastService
 REQUIRED_HEADERS: list[str] = [
     "所属部門コード", "所属部門名", "社員コード", "氏名",
     "WBS仮コード", "WBS名称", "会計年度",
@@ -42,23 +43,36 @@ _MONTH_MAP: dict[str, tuple[int, int]] = {
 
 
 class CsvImportService:
+    def __init__(self) -> None:
+        self._forecast_service = ForecastService()
+
     # ------------------------------------------------------------------
     # 公開: メインエントリ
     # ------------------------------------------------------------------
 
-    def import_plan_csv(self, file_content: bytes, db: Session) -> CsvUploadResponse:
-        """CSVをインポートし、バリデーション → upsert を行う。"""
+    def import_plan_csv(
+        self,
+        file_content: bytes,
+        db: Session,
+        version_name: str | None = None,
+        version_description: str | None = None,
+    ) -> CsvUploadResponse:
+        """CSVをインポートし、バリデーション → upsert → バージョン作成 を行う。"""
         fieldnames, rows = self._validate_and_parse(file_content)
         has_wbs_code = "WBSコード" in fieldnames
 
         try:
             summary = self._upsert_all(rows, has_wbs_code, db)
-            db.commit()
+            db.flush()
+            name = version_name or "CSV インポート"
+            version_no = self._forecast_service.create_version_with_snapshot(
+                db, name=name, description=version_description
+            )
         except Exception:
             db.rollback()
             raise
 
-        return CsvUploadResponse(summary=summary)
+        return CsvUploadResponse(version_no=version_no, summary=summary)
 
     # ------------------------------------------------------------------
     # 公開: バリデーション + パース

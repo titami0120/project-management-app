@@ -7,13 +7,26 @@ import type {
 } from '../types/workloadTypes'
 import apiClient from './client'
 
-export const uploadPlanCsv = async (file: File): Promise<CsvUploadResponse> => {
+export const uploadPlanCsv = async (
+  file: File,
+  versionName: string,
+  versionDescription?: string,
+): Promise<CsvUploadResponse> => {
   const form = new FormData()
   form.append('file', file)
+  form.append('version_name', versionName)
+  if (versionDescription) form.append('version_description', versionDescription)
   const { data } = await apiClient.post<CsvUploadResponse>(
     '/api/v1/workloads/plan/upload',
     form,
     { headers: { 'Content-Type': undefined } }
+  )
+  return data
+}
+
+export const clearMonthlyWorkloads = async (): Promise<{ deleted_count: number }> => {
+  const { data } = await apiClient.delete<{ deleted_count: number }>(
+    '/api/v1/workloads/plan/clear'
   )
   return data
 }

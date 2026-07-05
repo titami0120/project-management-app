@@ -1,5 +1,6 @@
-from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile
+from fastapi import APIRouter, Depends, Form, HTTPException, Query, UploadFile
 from fastapi.responses import Response
+from sqlalchemy import delete
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -10,6 +11,7 @@ from app.schemas.workload_schema import (
     ParticipatingProject,
     SimulationUpdateRequest,
 )
+from app.models.monthly_workload import MonthlyWorkload
 from app.services.csv_import_service import CsvImportService
 from app.services.exceptions import CsvValidationException
 from app.services.workload_service import WorkloadService
@@ -35,11 +37,17 @@ def _parse_ym(value: str) -> tuple[int, int]:
 )
 def upload_plan_csv(
     file: UploadFile,
+    version_name: str = Form(...),
+    version_description: str | None = Form(None),
     db: Session = Depends(get_db),
 ) -> CsvUploadResponse:
     content = file.file.read()
     try:
-        return _csv_import_service.import_plan_csv(content, db)
+        return _csv_import_service.import_plan_csv(
+            content, db,
+            version_name=version_name,
+            version_description=version_description or None,
+        )
     except CsvValidationException as exc:
         raise HTTPException(
             status_code=422,
@@ -47,6 +55,13 @@ def upload_plan_csv(
         )
     except Exception as exc:
         raise HTTPException(status_code=500, detail="Internal server error") from exc
+
+
+@router.delete("/plan/clear", status_code=200)
+def clear_monthly_workloads(db: Session = Depends(get_db)) -> dict[str, int]:
+    result = db.execute(delete(MonthlyWorkload))
+    db.commit()
+    return {"deleted_count": result.rowcount}
 
 
 @router.get("/participating-projects", response_model=list[ParticipatingProject])

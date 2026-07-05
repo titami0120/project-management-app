@@ -1,6 +1,7 @@
 import type { ImportSummary } from './commonTypes'
 
 export interface CsvUploadResponse {
+  version_no: number
   summary: ImportSummary
 }
 
