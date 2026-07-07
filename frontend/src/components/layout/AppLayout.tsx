@@ -2,11 +2,16 @@ import { useState } from 'react'
 import { Layout, Menu } from 'antd'
 import {
   BarChartOutlined,
+  ClusterOutlined,
+  DatabaseOutlined,
   FileTextOutlined,
   FundProjectionScreenOutlined,
   HistoryOutlined,
+  ProjectOutlined,
   SettingOutlined,
+  TeamOutlined,
   UploadOutlined,
+  UserOutlined,
 } from '@ant-design/icons'
 import { useNavigate, useLocation, Outlet } from 'react-router-dom'
 
@@ -39,6 +44,17 @@ const menuItems = [
     label: 'アップロード（計画工数CSV）',
   },
   {
+    key: 'master',
+    icon: <DatabaseOutlined />,
+    label: 'マスタ管理',
+    children: [
+      { key: '/master/departments', icon: <TeamOutlined />, label: '部門マスタ' },
+      { key: '/master/members', icon: <UserOutlined />, label: '要員マスタ' },
+      { key: '/master/teams', icon: <ClusterOutlined />, label: 'チームマスタ' },
+      { key: '/master/projects', icon: <ProjectOutlined />, label: 'プロジェクトマスタ' },
+    ],
+  },
+  {
     key: '/settings',
     icon: <SettingOutlined />,
     label: '設定',
@@ -50,12 +66,22 @@ const AppLayout = () => {
   const location = useLocation()
   const [collapsed, setCollapsed] = useState(false)
 
-  const selectedKey =
-    menuItems.find((item) => location.pathname.startsWith(item.key))?.key ?? '/workload'
+  const isMasterRoute = location.pathname.startsWith('/master')
+  const [openKeys, setOpenKeys] = useState<string[]>(isMasterRoute ? ['master'] : [])
+
+  const selectedKey = location.pathname
 
   return (
     <Layout style={{ minHeight: '100vh' }}>
-      <Sider collapsible collapsed={collapsed} onCollapse={setCollapsed} width={240}>
+      <Sider
+        collapsible
+        collapsed={collapsed}
+        onCollapse={(c) => {
+          setCollapsed(c)
+          if (c) setOpenKeys([])
+        }}
+        width={240}
+      >
         <div
           style={{
             height: 48,
@@ -76,8 +102,13 @@ const AppLayout = () => {
           theme="dark"
           mode="inline"
           selectedKeys={[selectedKey]}
+          openKeys={collapsed ? [] : openKeys}
+          onOpenChange={setOpenKeys}
           items={menuItems}
-          onClick={({ key }) => navigate(key)}
+          onClick={({ key }) => {
+            if (!key.startsWith('/')) return
+            navigate(key)
+          }}
         />
       </Sider>
       <Layout>

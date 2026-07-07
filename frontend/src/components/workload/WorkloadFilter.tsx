@@ -1,7 +1,8 @@
 import { Button, Form, Select } from 'antd'
 import { useEffect, useState } from 'react'
 import { getDepartments } from '../../api/departmentApi'
-import type { DepartmentResponse } from '../../types/projectTypes'
+import { getTeams } from '../../api/teamApi'
+import type { DepartmentResponse, TeamResponse } from '../../types/projectTypes'
 import type { ForecastQueryParams } from '../../types/workloadTypes'
 import { loadSettings } from '../../hooks/useSettings'
 
@@ -19,7 +20,9 @@ interface Props {
 const WorkloadFilter = ({ onFetch, loading }: Props) => {
   const defaults = loadSettings()
   const [departments, setDepartments] = useState<DepartmentResponse[]>([])
+  const [teams, setTeams] = useState<TeamResponse[]>([])
   const [deptId, setDeptId] = useState<number | undefined>(defaults.defaultDeptId)
+  const [teamId, setTeamId] = useState<number | undefined>(undefined)
   const [fromYear, setFromYear] = useState(defaults.defaultFromYear)
   const [fromMonth, setFromMonth] = useState(defaults.defaultFromMonth)
   const [toYear, setToYear] = useState(defaults.defaultToYear)
@@ -27,10 +30,26 @@ const WorkloadFilter = ({ onFetch, loading }: Props) => {
 
   useEffect(() => {
     getDepartments().then(setDepartments).catch(console.error)
+    getTeams().then(setTeams).catch(console.error)
   }, [])
 
+  const handleDeptChange = (value: number | undefined) => {
+    setDeptId(value)
+    if (value !== undefined) setTeamId(undefined)
+  }
+
+  const handleTeamChange = (value: number | undefined) => {
+    setTeamId(value)
+    if (value !== undefined) setDeptId(undefined)
+  }
+
   const handleFetch = () => {
-    onFetch({ from: fmt(fromYear, fromMonth), to: fmt(toYear, toMonth), dept_id: deptId })
+    onFetch({
+      from: fmt(fromYear, fromMonth),
+      to: fmt(toYear, toMonth),
+      dept_id: deptId,
+      team_id: teamId,
+    })
   }
 
   return (
@@ -38,14 +57,34 @@ const WorkloadFilter = ({ onFetch, loading }: Props) => {
       <Form.Item label="部門">
         <Select
           value={deptId}
-          onChange={setDeptId}
+          onChange={handleDeptChange}
+          onClear={() => handleDeptChange(undefined)}
           placeholder="全部門"
           allowClear
           style={{ width: 150 }}
+          disabled={teamId !== undefined}
         >
           {departments.map((d) => (
             <Select.Option key={d.id} value={d.id}>
               {d.name}
+            </Select.Option>
+          ))}
+        </Select>
+      </Form.Item>
+
+      <Form.Item label="チーム">
+        <Select
+          value={teamId}
+          onChange={handleTeamChange}
+          onClear={() => handleTeamChange(undefined)}
+          placeholder="指定なし"
+          allowClear
+          style={{ width: 160 }}
+          disabled={deptId !== undefined}
+        >
+          {teams.map((t) => (
+            <Select.Option key={t.id} value={t.id}>
+              {t.name}
             </Select.Option>
           ))}
         </Select>

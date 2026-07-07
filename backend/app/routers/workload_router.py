@@ -1,7 +1,11 @@
+import logging
+
 from fastapi import APIRouter, Depends, Form, HTTPException, Query, UploadFile
 from fastapi.responses import Response
 from sqlalchemy import delete
 from sqlalchemy.orm import Session
+
+logger = logging.getLogger(__name__)
 
 from app.database import get_db
 from app.schemas.workload_schema import (
@@ -54,6 +58,7 @@ def upload_plan_csv(
             detail={"errors": [e.model_dump() for e in exc.errors]},
         )
     except Exception as exc:
+        logger.exception("CSV upload failed: %s", exc)
         raise HTTPException(status_code=500, detail="Internal server error") from exc
 
 

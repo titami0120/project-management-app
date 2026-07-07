@@ -85,7 +85,7 @@ class TestMasterUpsert:
         assert len(depts) == 1
         assert depts[0].name == "開発部（更新）"
 
-    def test_department_is_deleted_flag_not_changed_on_update(self, db_session: Session) -> None:
+    def test_soft_deleted_department_is_restored_on_csv_import(self, db_session: Session) -> None:
         csv_bytes = _make_csv([_row()], extra_headers=["WBSコード"])
         service.import_plan_csv(csv_bytes, db_session)
         dept = db_session.query(Department).first()
@@ -97,7 +97,8 @@ class TestMasterUpsert:
         db_session.expire_all()
         dept = db_session.query(Department).first()
         assert dept is not None
-        assert dept.is_deleted is True
+        assert dept.is_deleted is False
+        assert dept.name == "開発部（更新）"
 
     def test_new_member_is_inserted(self, db_session: Session) -> None:
         csv_bytes = _make_csv([_row()], extra_headers=["WBSコード"])
@@ -115,6 +116,21 @@ class TestMasterUpsert:
         members = db_session.query(Member).all()
         assert len(members) == 1
         assert members[0].name == "山田次郎"
+
+    def test_soft_deleted_member_is_restored_on_csv_import(self, db_session: Session) -> None:
+        csv_bytes = _make_csv([_row()], extra_headers=["WBSコード"])
+        service.import_plan_csv(csv_bytes, db_session)
+        member = db_session.query(Member).first()
+        assert member is not None
+        member.is_deleted = True
+        db_session.commit()
+        csv2 = _make_csv([_row(emp_name="山田次郎")], extra_headers=["WBSコード"])
+        service.import_plan_csv(csv2, db_session)
+        db_session.expire_all()
+        member = db_session.query(Member).first()
+        assert member is not None
+        assert member.is_deleted is False
+        assert member.name == "山田次郎"
 
     def test_new_project_is_inserted(self, db_session: Session) -> None:
         csv_bytes = _make_csv([_row()], extra_headers=["WBSコード"])

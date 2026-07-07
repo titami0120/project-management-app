@@ -1,4 +1,5 @@
 import type {
+  ProjectCreateRequest,
   ProjectMatterAssignRequest,
   ProjectResponse,
   ProjectUpdateRequest,
@@ -12,9 +13,14 @@ export const getProjects = async (unassigned?: boolean): Promise<ProjectResponse
   return data
 }
 
+export const createProject = async (body: ProjectCreateRequest): Promise<ProjectResponse> => {
+  const { data } = await apiClient.post<ProjectResponse>('/api/v1/projects', body)
+  return data
+}
+
 export const updateProject = async (
   id: number,
-  request: ProjectUpdateRequest
+  request: ProjectUpdateRequest,
 ): Promise<ProjectResponse> => {
   const { data } = await apiClient.put<ProjectResponse>(`/api/v1/projects/${id}`, request)
   return data
@@ -22,8 +28,12 @@ export const updateProject = async (
 
 export const assignProjectMatter = async (
   id: number,
-  request: ProjectMatterAssignRequest
+  request: ProjectMatterAssignRequest,
 ): Promise<ProjectResponse> => {
   const { data } = await apiClient.put<ProjectResponse>(`/api/v1/projects/${id}/matter`, request)
   return data
+}
+
+export const deleteProject = async (id: number): Promise<void> => {
+  await apiClient.delete(`/api/v1/projects/${id}`)
 }

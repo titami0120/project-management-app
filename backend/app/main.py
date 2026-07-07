@@ -7,6 +7,7 @@ from app.routers import (
     matter_router,
     member_router,
     project_router,
+    team_router,
     workload_router,
 )
 
@@ -28,6 +29,7 @@ app.include_router(matter_router.router)
 app.include_router(project_router.router)
 app.include_router(department_router.router)
 app.include_router(member_router.router)
+app.include_router(team_router.router)
 app.include_router(forecast_version_router.router)
 
 

@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from pydantic import BaseModel, ConfigDict
 
 
@@ -11,12 +13,22 @@ class ProjectResponse(BaseModel):
     display_order: int | None
     matter_id: int | None
     matter_name: str | None
+    created_at: datetime
+
+
+class ProjectCreateRequest(BaseModel):
+    wbs_tmp: str
+    name: str
+    code: str | None = None
+    display_order: int | None = None
+    matter_id: int | None = None
 
 
 class ProjectUpdateRequest(BaseModel):
     name: str | None = None
     code: str | None = None
     display_order: int | None = None
+    matter_id: int | None = None
 
 
 class ProjectMatterAssignRequest(BaseModel):

@@ -209,7 +209,7 @@ class CsvImportService:
                 .values(code=dept["code"], name=dept["name"], is_deleted=False)
                 .on_conflict_do_update(
                     index_elements=["code"],
-                    set_={"name": dept["name"]},
+                    set_={"name": dept["name"], "is_deleted": False},
                 )
             )
             db.execute(stmt)
@@ -255,7 +255,7 @@ class CsvImportService:
                 )
                 .on_conflict_do_update(
                     index_elements=["employee_code"],
-                    set_={"name": m["name"], "department_id": m["department_id"]},
+                    set_={"name": m["name"], "department_id": m["department_id"], "is_deleted": False},
                 )
             )
             db.execute(stmt)
