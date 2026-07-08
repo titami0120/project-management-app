@@ -150,6 +150,6 @@ def download_forecast_csv(
     filename = f"workload_{from_}_{to}.csv"
     return Response(
         content=csv_bytes,
-        media_type="text/csv; charset=shift_jis",
+        media_type="text/csv; charset=shift_jis",  # cp932 (Windows Shift-JIS)
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )

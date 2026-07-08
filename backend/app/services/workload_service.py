@@ -216,7 +216,7 @@ class WorkloadService:
         month_to: int,
         project_id: int | None = None,
     ) -> bytes:
-        """計画工数CSVと同一フォーマット（Shift-JIS、会計年度×月列）でダウンロードする。"""
+        """計画工数CSVと同一フォーマット（CP932、会計年度×月列）でダウンロードする。"""
         ym_from = year_from * 100 + month_from
         ym_to = year_to * 100 + month_to
 
@@ -257,8 +257,8 @@ class WorkloadService:
 
         # (社員コード, WBS仮コード, 会計年度) → 月列値
         rows_map: dict[tuple[str, str, int], dict[str, Decimal]] = {}
-        # メタ情報（部門・氏名・WBS名称）を保持
-        meta_map: dict[tuple[str, str, int], tuple[str, str, str, str, str, str]] = {}
+        # メタ情報（部門・氏名・WBS情報）を保持
+        meta_map: dict[tuple[str, str, int], tuple[str, str, str, str, str, str, str]] = {}
 
         for wl in workloads:
             forecast_mm: Decimal | None = (
@@ -282,13 +282,13 @@ class WorkloadService:
                 meta_map[group_key] = (
                     dept.code, dept.name,
                     member.employee_code, member.name,
-                    project.wbs_tmp, project.name,
+                    project.wbs_tmp, project.code or "", project.name,
                 )
             rows_map[group_key][month_col] = forecast_mm
 
         headers = [
             "所属部門コード", "所属部門名", "社員コード", "氏名",
-            "WBS仮コード", "WBS名称", "会計年度",
+            "WBS仮コード", "WBSコード", "WBS名称", "会計年度",
             *self._MONTH_COLS,
         ]
         buf = io.StringIO()
@@ -296,7 +296,7 @@ class WorkloadService:
         writer.writeheader()
 
         for group_key, month_vals in rows_map.items():
-            dept_code, dept_name, emp_code, emp_name, wbs_tmp, proj_name = meta_map[group_key]
+            dept_code, dept_name, emp_code, emp_name, wbs_tmp, wbs_code, proj_name = meta_map[group_key]
             _, _, fy = group_key
             row: dict[str, object] = {
                 "所属部門コード": dept_code,
@@ -304,6 +304,7 @@ class WorkloadService:
                 "社員コード": emp_code,
                 "氏名": emp_name,
                 "WBS仮コード": wbs_tmp,
+                "WBSコード": wbs_code,
                 "WBS名称": proj_name,
                 "会計年度": fy,
             }
@@ -311,4 +312,4 @@ class WorkloadService:
                 row[col] = f"{month_vals[col]:.2f}"
             writer.writerow(row)
 
-        return buf.getvalue().encode("shift_jis")
+        return buf.getvalue().encode("cp932")

@@ -20,7 +20,7 @@ from app.services.workload_service import WorkloadService
 
 EXPECTED_HEADERS = [
     "所属部門コード", "所属部門名", "社員コード", "氏名",
-    "WBS仮コード", "WBS名称", "会計年度",
+    "WBS仮コード", "WBSコード", "WBS名称", "会計年度",
     "4月", "5月", "6月", "7月", "8月", "9月",
     "10月", "11月", "12月", "1月", "2月", "3月",
 ]
@@ -43,8 +43,13 @@ def _member(db: Session, dept: Department, code: str = "E001", name: str = "山�
     return m
 
 
-def _project(db: Session, wbs_tmp: str = "WBS-001", name: str = "システム開発") -> Project:
-    p = Project(wbs_tmp=wbs_tmp, name=name)
+def _project(
+    db: Session,
+    wbs_tmp: str = "WBS-001",
+    name: str = "システム開発",
+    code: str | None = None,
+) -> Project:
+    p = Project(wbs_tmp=wbs_tmp, name=name, code=code)
     db.add(p)
     db.flush()
     return p
@@ -73,14 +78,14 @@ def _workload(
 
 
 def _parse_csv(csv_bytes: bytes) -> list[dict[str, str]]:
-    """Shift-JISでデコードしてDictReaderでパース"""
-    text = csv_bytes.decode("shift_jis")
+    """CP932（Windows Shift-JIS）でデコードしてDictReaderでパース"""
+    text = csv_bytes.decode("cp932")
     reader = csv.DictReader(io.StringIO(text))
     return list(reader)
 
 
 def _parse_csv_headers(csv_bytes: bytes) -> list[str]:
-    text = csv_bytes.decode("shift_jis")
+    text = csv_bytes.decode("cp932")
     reader = csv.reader(io.StringIO(text))
     return next(reader)
 
@@ -145,7 +150,7 @@ class TestDownloadForecastCsv:
         """CSV行に部門・要員・プロジェクト・会計年度・月別工数が含まれる"""
         dept = _dept(db_session)
         member = _member(db_session, dept, code="E999", name="鈴木三郎")
-        project = _project(db_session, wbs_tmp="WBS-XYZ", name="基盤開発")
+        project = _project(db_session, wbs_tmp="WBS-XYZ", name="基盤開発", code="WBS-XYZ-REAL")
         _workload(
             db_session, member, project, 2025, 7,
             planned_mm=Decimal("0.75")
@@ -161,9 +166,24 @@ class TestDownloadForecastCsv:
         assert rows[0]["社員コード"] == "E999"
         assert rows[0]["氏名"] == "鈴木三郎"
         assert rows[0]["WBS仮コード"] == "WBS-XYZ"
+        assert rows[0]["WBSコード"] == "WBS-XYZ-REAL"
         assert rows[0]["WBS名称"] == "基盤開発"
         assert rows[0]["会計年度"] == "2025"
         assert rows[0]["7月"] == "0.75"
+
+    def test_csv_wbs_code_empty_when_not_set(self, db_session: Session) -> None:
+        """WBSコードが未設定のプロジェクトはWBSコード列が空文字"""
+        dept = _dept(db_session)
+        member = _member(db_session, dept)
+        project = _project(db_session)  # code=None
+        _workload(db_session, member, project, 2025, 4, planned_mm=Decimal("1.00"))
+        db_session.commit()
+
+        svc = WorkloadService()
+        result = svc.download_forecast_csv(db_session, None, None, 2025, 4, 2025, 4)
+        rows = _parse_csv(result)
+
+        assert rows[0]["WBSコード"] == ""
 
     def test_csv_filters_by_date_range(self, db_session: Session) -> None:
         """期間外の月はCSVに含まれない（期間内の月のみ値が入る）"""
@@ -366,7 +386,7 @@ class TestDownloadEndpoint:
     def test_endpoint_returns_csv_with_data(
         self, api_client_with_data: TestClient
     ) -> None:
-        """DBにデータがある場合、CSVにデータ行が含まれる（Shift-JISデコード）"""
+        """DBにデータがある場合、CSVにデータ行が含まれる（CP932デコード）"""
         response = api_client_with_data.get(
             "/api/v1/workloads/forecast/download",
             params={"from": "2025-04", "to": "2025-09"},
